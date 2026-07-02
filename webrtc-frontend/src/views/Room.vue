@@ -106,32 +106,12 @@ watch(remoteStreams, (streams) => {
 }, { deep: false })
 
 onMounted(async () => {
-  connect()
-
-  try {
-    if (!connected.value) {
-      await new Promise(resolve => socket.once('connect', resolve))
-    }
-
-    // 先获取 TURN 凭证，再开启摄像头
-    await fetchIceServers()
-    await startLocalStream()
-
-    // 尝试加入已有房间，失败则创建新房间
-    await joinRoom(roomId, nickname.value).catch(async () => {
-      await createRoom(roomId, nickname.value)
-    })
-  } catch (err) {
-    error.value = '初始化失败: ' + err.message
-  }
-
-  // new joiner sees existing users — impolite (initiates offer)
+  // 1. 先注册所有信号监听（必须在 join 之前，否则错过事件）
   socket.on('room-joined', ({ users: roomUsers }) => {
     users.value = roomUsers.filter(u => u.id !== socket.id)
     users.value.forEach(user => createPeer(user.id, false))
   })
 
-  // existing users see new joiner — polite (accepts offer)
   socket.on('user-joined', ({ userId, nickname: nick }) => {
     users.value.push({ id: userId, nickname: nick })
     createPeer(userId, true)
@@ -153,6 +133,26 @@ onMounted(async () => {
   socket.on('ice-candidate', ({ from, candidate }) => {
     handleIceCandidate(from, candidate)
   })
+
+  // 2. 连接服务器
+  connect()
+
+  try {
+    if (!connected.value) {
+      await new Promise(resolve => socket.once('connect', resolve))
+    }
+
+    // 3. 获取 TURN + 摄像头
+    await fetchIceServers()
+    await startLocalStream()
+
+    // 4. 加入/创建房间
+    await joinRoom(roomId, nickname.value).catch(async () => {
+      await createRoom(roomId, nickname.value)
+    })
+  } catch (err) {
+    error.value = '初始化失败: ' + err.message
+  }
 })
 
 onUnmounted(() => {
