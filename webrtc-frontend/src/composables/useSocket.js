@@ -1,7 +1,11 @@
 import { io } from 'socket.io-client'
 import { ref } from 'vue'
 
-const URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
+// VITE_SOCKET_URL 仅在开发环境跨域时需要（如 Vite 5173 → 后端 3000）
+// 生产部署时前后端同域，自动用当前页面地址
+const URL = import.meta.env.DEV
+  ? (import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000')
+  : window.location.origin
 
 export function useSocket() {
   const socket = io(URL, { autoConnect: false })

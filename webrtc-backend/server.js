@@ -1,7 +1,11 @@
 import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import 'dotenv/config'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 app.use(express.json())
@@ -94,6 +98,20 @@ async function getIceServers() {
 app.get('/api/ice-servers', async (_req, res) => {
   const servers = await getIceServers()
   res.json({ iceServers: servers })
+})
+
+// ===== 静态文件服务（生产模式，部署到服务器时使用）=====
+const frontDist = path.join(__dirname, '..', 'webrtc-frontend', 'dist')
+app.use(express.static(frontDist))
+app.get('*', (req, res, next) => {
+  // API 请求和有后缀的文件请求交给 express 自己处理
+  if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/') || path.extname(req.path)) {
+    return next()
+  }
+  // SPA 回退
+  res.sendFile(path.join(frontDist, 'index.html'), (err) => {
+    if (err) next()
+  })
 })
 
 const rooms = new Map()
