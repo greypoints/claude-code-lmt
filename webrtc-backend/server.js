@@ -12,18 +12,61 @@ const io = new Server(httpServer, {
 })
 
 // ===== ICE Server 配置（STUN + TURN）=====
-// 优先使用 Metered.ca TURN（免费 0.5GB/月），留空则仅用 STUN
+// 三种配置方式（优先级 C > B > A）：
+//   A: METERED_API_KEY  → Metered.ca 在线获取动态凭证
+//   B: TURN_URL + TURN_USERNAME + TURN_CREDENTIAL  → 静态凭证
+//   C: COTURN_SECRET + COTURN_URL  → coturn HMAC-SHA1 动态凭证（最安全）
+
+const COTURN_SECRET = process.env.COTURN_SECRET || ''
+const COTURN_URL = process.env.COTURN_URL || ''
+const TURN_URL = process.env.TURN_URL || ''
+const TURN_USERNAME = process.env.TURN_USERNAME || ''
+const TURN_CREDENTIAL = process.env.TURN_CREDENTIAL || ''
 const METERED_API_KEY = process.env.METERED_API_KEY || ''
+
+const crypto = await import('crypto')
+
+function hmacTurnCredential(username, secret) {
+  const hmac = crypto.createHmac('sha1', secret)
+  const ttl = 24 * 3600          // 24 小时有效
+  const timestamp = Math.floor(Date.now() / 1000) + ttl
+  const username2 = `${timestamp}:${username}`
+  hmac.update(username2)
+  return {
+    urls: [COTURN_URL],
+    username: username2,
+    credential: hmac.digest('base64'),
+    ttl
+  }
+}
 
 async function getIceServers() {
   const servers = []
 
-  // 始终带 STUN
+  // 始终带 Google STUN
   servers.push({ urls: 'stun:stun.l.google.com:19302' })
 
+  // C: 自建 coturn HMAC 模式
+  if (COTURN_SECRET && COTURN_URL) {
+    servers.push(hmacTurnCredential('webrtc', COTURN_SECRET))
+    console.log('[TURN] coturn HMAC 凭证已生成')
+    return servers
+  }
+
+  // B: 静态 TURN 凭证
+  if (TURN_URL && TURN_USERNAME && TURN_CREDENTIAL) {
+    servers.push({
+      urls: [TURN_URL],
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL
+    })
+    console.log('[TURN] 静态凭证已配置:', TURN_URL)
+    return servers
+  }
+
+  // A: Metered.ca 在线获取
   if (METERED_API_KEY) {
     try {
-      // 调 Metered.ca REST API 获取临时 TURN 凭证
       const res = await fetch(
         `https://global.relay.metered.ca/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`
       )
@@ -35,7 +78,7 @@ async function getIceServers() {
           credential: data.password || '',
           ttl: data.ttl || 86400
         })
-        console.log('[TURN] Metered.ca 凭证已获取，ttl=', data.ttl)
+        console.log('[TURN] Metered.ca 凭证已获取')
       } else {
         console.warn('[TURN] Metered.ca API 返回错误:', res.status)
       }

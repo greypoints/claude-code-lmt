@@ -1,0 +1,11 @@
+{
+  "name": "webrtc-video-conf",
+  "private": true,
+  "scripts": {
+    "install:all": "cd webrtc-backend && npm install && cd ../webrtc-frontend && npm install",
+    "start:backend": "cd webrtc-backend && npm start",
+    "start:frontend": "cd webrtc-frontend && npm run dev",
+    "start": "start \"\" cmd /c \"cd /d webrtc-backend && npm start\" && start \"\" cmd /c \"cd /d webrtc-frontend && npm run dev\"",
+    "dev": "start \"Backend\" cmd /c \"cd /d webrtc-backend && npm start\" && start \"Frontend\" cmd /c \"cd /d webrtc-frontend && npm run dev\""
+  }
+}

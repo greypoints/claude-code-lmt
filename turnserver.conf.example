@@ -1,0 +1,26 @@
+# coturn TURN 服务器配置文件示例
+# 安装: Windows: https://github.com/coturn/coturn 自行编译或使用 Docker
+#       Linux: apt install coturn
+# 启动: turnserver -c turnserver.conf
+
+listening-port=3478
+# 如果希望支持 TCP 和 TLS:
+# tls-listening-port=5349
+
+# 监听所有网卡
+listening-ip=0.0.0.0
+# 公网 IP（替换为你的服务器公网 IP，本地测试用本机 IP）
+external-ip=YOUR_PUBLIC_IP
+
+# 认证方式：长期凭证 + HMAC（对应后端 COTURN_SECRET 模式）
+lt-cred-mech
+use-auth-secret
+static-auth-secret=your-static-secret-here
+
+# 允许的端口范围
+min-port=49152
+max-port=65535
+
+# 日志
+verbose
+log-file=/var/log/turnserver.log
