@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(where node *)",
+      "Bash(where npm *)",
+      "Read(//c/Program Files/**)",
+      "Bash(PATH='__TRACKED_VAR__:/c/Program Files/nodejs:/c/Program Files \\(x86\\)/nodejs' npm --version)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Users//**)",
+      "Bash(powershell -Command \"Get-Command node -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source; Get-Command npm -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(reg query *)",
+      "Read(//c/tools/**)",
+      "Read(//c//**)",
+      "Bash(cmd //c \"where node\")",
+      "Bash(powershell.exe -Command \"Get-Command node -ErrorAction Stop | Select-Object -ExpandProperty Source\")",
+      "Bash(ls -la \"D:/Program Files/nodejs/\" 2>&1)",
+      "Read(//d/Program Files/nodejs/**)",
+      "Bash(curl -s http://localhost:5173)"
+    ]
+  }
+}
