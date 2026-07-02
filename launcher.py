@@ -23,6 +23,8 @@ FRONTEND_PORT = 5173
 
 # 确保 Node.js 在 PATH 中
 NODE_PATH = r"D:\Program Files\nodejs"
+NODE_EXE = os.path.join(NODE_PATH, "node.exe") if os.path.isdir(NODE_PATH) else "node"
+NPX_CMD = os.path.join(NODE_PATH, "npx.cmd") if os.path.isdir(NODE_PATH) else "npx"
 if os.path.isdir(NODE_PATH):
     os.environ["PATH"] = NODE_PATH + os.pathsep + os.environ.get("PATH", "")
 
@@ -175,7 +177,7 @@ class LauncherApp:
 
         try:
             self.backend_proc = subprocess.Popen(
-                ["node", "server.js"],
+                [NODE_EXE, "server.js"],
                 cwd=BACKEND_DIR,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -205,7 +207,7 @@ class LauncherApp:
 
         try:
             self.frontend_proc = subprocess.Popen(
-                ["npx", "vite", "--host"],
+                [NPX_CMD, "vite", "--host"] if sys.platform == "win32" else ["npx", "vite", "--host"],
                 cwd=FRONTEND_DIR,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
