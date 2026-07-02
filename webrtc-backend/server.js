@@ -1,7 +1,9 @@
 import express from 'express'
-import { createServer } from 'http'
+import { createServer as createHttpServer } from 'http'
+import { createServer as createHttpsServer } from 'https'
 import { Server } from 'socket.io'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import 'dotenv/config'
 
@@ -10,7 +12,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 app.use(express.json())
 
-const httpServer = createServer(app)
+// HTTPS 证书（自签名即可绕过浏览器 getUserMedia 限制）
+let httpServer
+const KEY_PATH = process.env.HTTPS_KEY || '/root/key.pem'
+const CERT_PATH = process.env.HTTPS_CERT || '/root/cert.pem'
+
+if (fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) {
+  const httpsOpts = {
+    key: fs.readFileSync(KEY_PATH),
+    cert: fs.readFileSync(CERT_PATH)
+  }
+  httpServer = createHttpsServer(httpsOpts, app)
+  console.log('[HTTPS] 已启用 (自签名证书，浏览器需点"高级→继续访问")')
+} else {
+  httpServer = createHttpServer(app)
+  console.log('[HTTP] 未找到证书，使用 HTTP (仅 localhost 可调摄像头)')
+}
+
 const io = new Server(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 })
@@ -200,6 +218,7 @@ function leaveRoom(socket) {
 }
 
 const PORT = process.env.PORT || 3000
+const proto = fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH) ? 'https' : 'http'
 httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+  console.log(`Server running on ${proto}://localhost:${PORT}`)
 })
