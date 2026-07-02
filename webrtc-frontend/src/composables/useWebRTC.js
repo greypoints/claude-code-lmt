@@ -87,20 +87,21 @@ export function useWebRTC(socketCallbacks) {
     }
 
     pc.onnegotiationneeded = async () => {
-      const entry = peers.get(userId)
-      if (!entry) return
+      const e = peers.get(userId)
+      if (!e) return
       try {
-        entry.makingOffer = true
+        e.makingOffer = true
         await pc.setLocalDescription()
         socketCallbacks.onOffer(userId, pc.localDescription)
       } catch (err) {
         console.error('negotiation error:', err)
       } finally {
-        entry.makingOffer = false
+        const e2 = peers.get(userId)
+        if (e2) e2.makingOffer = false
       }
     }
 
-    return entry
+    return peers.get(userId)
   }
 
   async function handleOffer(userId, sdp) {
@@ -120,6 +121,7 @@ export function useWebRTC(socketCallbacks) {
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(sdp))
+      _flushCandidates(entry)
       await pc.setLocalDescription()
       socketCallbacks.onAnswer(userId, pc.localDescription)
     } catch (err) {
@@ -132,6 +134,7 @@ export function useWebRTC(socketCallbacks) {
     if (!entry) return
     try {
       await entry.pc.setRemoteDescription(new RTCSessionDescription(sdp))
+      _flushCandidates(entry)
     } catch (err) {
       console.error('handleAnswer error:', err)
     }
@@ -140,7 +143,28 @@ export function useWebRTC(socketCallbacks) {
   function handleIceCandidate(userId, candidate) {
     const entry = peers.get(userId)
     if (!entry) return
-    entry.pc.addIceCandidate(new RTCIceCandidate(candidate))
+    // 缓存过早到达的 ICE candidates，等 remote description 就绪后再添加
+    if (!entry.pc.remoteDescription) {
+      if (!entry._pendingCandidates) entry._pendingCandidates = []
+      entry._pendingCandidates.push(candidate)
+      return
+    }
+    _addCandidate(entry, candidate)
+  }
+
+  function _addCandidate(entry, candidate) {
+    entry.pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
+      console.warn('addIceCandidate error:', err.message)
+    })
+  }
+
+  function _flushCandidates(entry) {
+    if (entry._pendingCandidates && entry.pc.remoteDescription) {
+      for (const c of entry._pendingCandidates) {
+        _addCandidate(entry, c)
+      }
+      entry._pendingCandidates = []
+    }
   }
 
   function closePeer(userId) {
