@@ -120,14 +120,24 @@ app.get('/api/ice-servers', async (_req, res) => {
 
 // ===== 静态文件服务（生产模式，部署到服务器时使用）=====
 const frontDist = path.join(__dirname, '..', 'webrtc-frontend', 'dist')
-app.use(express.static(frontDist))
+// 禁止缓存 HTML，防止更新后加载旧文件
+app.use(express.static(frontDist, {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-cache')
+    }
+  }
+}))
 app.get('*', (req, res, next) => {
-  // API 请求和有后缀的文件请求交给 express 自己处理
-  if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/') || path.extname(req.path)) {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) {
     return next()
   }
+  // 静态文件 404 直接返回 404，不回退到 index.html
+  if (path.extname(req.path)) {
+    return res.status(404).end()
+  }
   // SPA 回退
-  res.sendFile(path.join(frontDist, 'index.html'), (err) => {
+  res.sendFile(path.join(frontDist, 'index.html'), { headers: { 'Cache-Control': 'no-cache' } }, (err) => {
     if (err) next()
   })
 })
