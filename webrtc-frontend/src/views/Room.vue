@@ -69,6 +69,7 @@ const {
 const {
   localStream,
   remoteStreams,
+  fetchIceServers,
   startLocalStream,
   createPeer,
   handleOffer,
@@ -111,14 +112,17 @@ onMounted(async () => {
     if (!connected.value) {
       await new Promise(resolve => socket.once('connect', resolve))
     }
+
+    // 先获取 TURN 凭证，再开启摄像头
+    await fetchIceServers()
     await startLocalStream()
 
-    // determine if room exists (try join first, create on failure)
+    // 尝试加入已有房间，失败则创建新房间
     await joinRoom(roomId, nickname.value).catch(async () => {
       await createRoom(roomId, nickname.value)
     })
   } catch (err) {
-    error.value = '加入房间失败: ' + err
+    error.value = '初始化失败: ' + err.message
   }
 
   // new joiner sees existing users — impolite (initiates offer)

@@ -1,15 +1,35 @@
 import { ref, shallowRef } from 'vue'
 
-const ICE_SERVERS = import.meta.env.VITE_ICE_SERVERS
-  ? import.meta.env.VITE_ICE_SERVERS.split(',').map(url => ({ urls: url.trim() }))
-  : [{ urls: 'stun:stun.l.google.com:19302' }]
+// 默认 STUN（首次调用前用，后续从后端获取 TURN 凭证后替换）
+const FALLBACK_ICE = [{ urls: 'stun:stun.l.google.com:19302' }]
 
 export function useWebRTC(socketCallbacks) {
   const localStream = shallowRef(null)
   const remoteStreams = ref(new Map())
   const peers = new Map()
 
-  let pcConfig = { iceServers: ICE_SERVERS }
+  let iceServers = [...FALLBACK_ICE]
+
+  // 从后端获取最新的 ICE 配置（含 TURN 临时凭证）
+  async function fetchIceServers() {
+    try {
+      const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin
+      const httpUrl = socketUrl.replace(/^http/, 'http') // ws → http
+      const base = import.meta.env.VITE_API_BASE || httpUrl
+      const res = await fetch(`${base}/api/ice-servers`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.iceServers?.length) {
+          iceServers = data.iceServers
+          console.log('[WebRTC] ICE 配置已更新:', iceServers.map(s => s.urls).flat())
+          return iceServers
+        }
+      }
+    } catch (e) {
+      console.warn('[WebRTC] 获取 ICE 配置失败，使用默认 STUN:', e.message)
+    }
+    return FALLBACK_ICE
+  }
 
   async function startLocalStream() {
     localStream.value = await navigator.mediaDevices.getUserMedia({
@@ -26,10 +46,14 @@ export function useWebRTC(socketCallbacks) {
     }
   }
 
+  function createPeerConfig() {
+    return { iceServers }
+  }
+
   function createPeer(userId, polite) {
     if (peers.has(userId)) return peers.get(userId)
 
-    const pc = new RTCPeerConnection(pcConfig)
+    const pc = new RTCPeerConnection(createPeerConfig())
     peers.set(userId, { pc, polite, makingOffer: false, ignoreOffer: false })
 
     if (localStream.value) {
@@ -70,9 +94,7 @@ export function useWebRTC(socketCallbacks) {
 
   async function handleOffer(userId, sdp) {
     let entry = peers.get(userId)
-    if (!entry) {
-      entry = createPeer(userId, false)
-    }
+    if (!entry) entry = createPeer(userId, false)
 
     const { pc } = entry
     const readyForOffer =
@@ -129,6 +151,7 @@ export function useWebRTC(socketCallbacks) {
   return {
     localStream,
     remoteStreams,
+    fetchIceServers,
     startLocalStream,
     stopLocalStream,
     createPeer,
