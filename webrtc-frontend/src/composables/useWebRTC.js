@@ -63,10 +63,21 @@ export function useWebRTC(socketCallbacks) {
     }
 
     pc.ontrack = (event) => {
+      console.log('[WebRTC] ontrack from', userId, 'streams:', event.streams.length)
       const stream = event.streams[0]
-      const streams = new Map(remoteStreams.value)
-      streams.set(userId, stream)
-      remoteStreams.value = streams
+      if (stream) {
+        const streams = new Map(remoteStreams.value)
+        streams.set(userId, stream)
+        remoteStreams.value = streams
+      }
+    }
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('[WebRTC] ICE state with', userId, ':', pc.iceConnectionState)
+    }
+
+    pc.onconnectionstatechange = () => {
+      console.log('[WebRTC] Connection state with', userId, ':', pc.connectionState)
     }
 
     pc.onicecandidate = (event) => {

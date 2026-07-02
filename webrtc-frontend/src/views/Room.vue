@@ -96,14 +96,24 @@ watch(localStream, async (stream) => {
 })
 
 // watch remote streams -> attach to video elements
-watch(remoteStreams, (streams) => {
+watch(remoteStreams, async (streams) => {
+  await nextTick()  // 等 Vue 渲染完 video 元素
   for (const [userId, stream] of streams) {
     const el = remoteVideoRefs[userId]
     if (el && el.srcObject !== stream) {
       el.srcObject = stream
+      console.log('[Room] 远程视频已绑定:', userId)
+    } else if (!el) {
+      console.warn('[Room] 视频元素未找到:', userId, ', 稍后重试...')
+      // 再等一帧
+      await nextTick()
+      const el2 = remoteVideoRefs[userId]
+      if (el2 && el2.srcObject !== stream) {
+        el2.srcObject = stream
+      }
     }
   }
-}, { deep: false })
+}, { deep: true })
 
 onMounted(async () => {
   // 1. 先注册所有信号监听（必须在 join 之前，否则错过事件）
